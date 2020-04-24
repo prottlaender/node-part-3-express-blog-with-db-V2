@@ -21,6 +21,9 @@ module.exports = {
     // be added as blog reference on the authors user object
     var newBlogTitle = { title: req.body.title }
 
+    var authorFirstName = req.body.firstname
+    var authorLastName = req.body.lastname
+
     // create the new Blog Object with input from the req.body
     const newBlog = new Blog({
       title: req.body.title,
@@ -29,13 +32,20 @@ module.exports = {
       "author.email": req.body.email,
       date: req.body.date,
     })
-    
+
     // Query User and filter for newBlogAuthorEmail then call function(user) to
     // check if a user with newBlogAuthorEmail exist
     User.findOne(newBlogAuthorEmail).then(function(user) {
+      console.log(user.name)
+      console.log(user.lastname)
       if(!user) {
         // if no user found end the request and send response
         res.send('No User for this Author Email. Create Blog not possible')
+
+      } else if (user.name !== authorFirstName || user.lastname !== authorLastName) {
+        // if user found and email belong to another user end the request and send response
+        res.send('The Author Email belong to another existing user. Create Blog not possible')
+
       } else {
         // save new Blog Object
         newBlog.save((error) => {
@@ -97,10 +107,21 @@ module.exports = {
         // check if a user with removeBlogAuthorEmail exist
         User.findOne(removeBlogAuthorEmail).then(function(user) {
           if (!user) {
-            // if no user found end the request and send response
-            res.send('No User with this Author Email. Blog Removal not possible')
+            // if no user exist delete only blog match removeBlogId
+            Blog.deleteOne(removeBlogId, async function(error) {
+              if (error) {
+                // in case an error occur end the request and send response
+                res.send( { status: 'Blog deletion error', message: error.message } )
+              } else {
+                // update the User Object that match removeAuthorEmail
+                // and remove the blogid reference object from the user using the $pull operator
+                await User.updateOne(removeBlogAuthorEmail, { "$pull": { "ref.blogs": removeBlogId } })
+                res.send('Blog successfully removed. No User found with Author Email.')
+              }
+            })
+
           } else {
-            // if user exist delete blog match removeBlogId
+            // if user exist delete blog match removeBlogId and update user
             Blog.deleteOne(removeBlogId, async function(error) {
               if (error) {
                 // in case an error occur end the request and send response
