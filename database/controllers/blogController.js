@@ -112,10 +112,8 @@ module.exports = {
               if (error) {
                 // in case an error occur end the request and send response
                 res.send( { status: 'Blog deletion error', message: error.message } )
+
               } else {
-                // update the User Object that match removeAuthorEmail
-                // and remove the blogid reference object from the user using the $pull operator
-                await User.updateOne(removeBlogAuthorEmail, { "$pull": { "ref.blogs": removeBlogId } })
                 res.send('Blog successfully removed. No User found with Author Email.')
               }
             })
@@ -126,6 +124,7 @@ module.exports = {
               if (error) {
                 // in case an error occur end the request and send response
                 res.send( { status: 'Blog deletion error', message: error.message } )
+                
               } else {
                 // update the User Object that match removeAuthorEmail
                 // and remove the blogid reference object from the user using the $pull operator
