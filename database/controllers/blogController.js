@@ -36,8 +36,7 @@ module.exports = {
     // Query User and filter for newBlogAuthorEmail then call function(user) to
     // check if a user with newBlogAuthorEmail exist
     User.findOne(newBlogAuthorEmail).then(function(user) {
-      console.log(user.name)
-      console.log(user.lastname)
+      
       if(!user) {
         // if no user found end the request and send response
         res.send('No User for this Author Email. Create Blog not possible')
@@ -124,7 +123,7 @@ module.exports = {
               if (error) {
                 // in case an error occur end the request and send response
                 res.send( { status: 'Blog deletion error', message: error.message } )
-                
+
               } else {
                 // update the User Object that match removeAuthorEmail
                 // and remove the blogid reference object from the user using the $pull operator

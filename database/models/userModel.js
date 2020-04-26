@@ -16,7 +16,6 @@ var userSchema = new Schema({
 
   _created: {
     type: Date,
-    auto: true,
     default: Date.now()
   },
 
