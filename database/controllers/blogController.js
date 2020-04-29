@@ -11,56 +11,74 @@ module.exports = {
   createBlog: function (req, res) {
     // create the User.findOne filter object using the
     // author email from request body and assign it to newBlogAuthorEmail
-    // User.findOne will be used (1) to check if the author exist and
-    // (2) to add the new blogid as blog reference on the authors user object
+    // User.findOne will be used to check if the user exist with newBlogAuthorEmail
     var newBlogAuthorEmail = { email: req.body.email }
 
     // create the Blog.findOne filter object using the
     // new blog title from request body and assign it to newBlogTitle
-    // Blog.findOne will be used to retrieve the new created blogid which will
+    // Blog.findOne will be used to retrieve the new created blogid which must
     // be added as blog reference on the authors user object
     var newBlogTitle = { title: req.body.title }
 
+    // assign input data from request body to input variables
+    var title = req.body.title
     var authorFirstName = req.body.firstname
     var authorLastName = req.body.lastname
+    var authorEmail = req.body.email
+    var date = req.body.date
 
-    // create the new Blog Object with input from the req.body
+    // create the new Blog Object with input variables
     const newBlog = new Blog({
-      title: req.body.title,
-      "author.firstname": req.body.firstname,
-      "author.lastname": req.body.lastname,
-      "author.email": req.body.email,
-      date: req.body.date,
+      title: title,
+      "author.firstname": authorFirstName,
+      "author.lastname": authorLastName,
+      "author.email": authorEmail,
+      date: date,
     })
 
-    // Query User and filter for newBlogAuthorEmail then call function(user) to
-    // check if a user with newBlogAuthorEmail exist
-    User.findOne(newBlogAuthorEmail).then(function(user) {
-      
-      if(!user) {
+    // Query User and filter for newBlogAuthorEmail then call function(error, user) to check
+    // if an error occurs or user with userEmail not exist
+    User.findOne(newBlogAuthorEmail, function(error, user) {
+      if (error) {
+        // in case of an error finding user end the request and send response
+        res.send( { status: 'Error in user query', message: error.message } )
+
+      } else if (!user) {
         // if no user found end the request and send response
         res.send('No User for this Author Email. Create Blog not possible')
 
       } else if (user.name !== authorFirstName || user.lastname !== authorLastName) {
-        // if user found and email belong to another user end the request and send response
-        res.send('The Author Email belong to another existing user. Create Blog not possible')
+        // if user found but first- lastname not match end the request and send response
+        res.send('The Author First- and Lastname entered not match the User found. Create Blog not possible')
 
       } else {
+        // user found and first- lastname match
         // save new Blog Object
-        newBlog.save((error) => {
+        newBlog.save(function(error, blog) {
           if (error) {
-            // in case of an error in input validation end the request and send response
-            res.send( { status: 'Blog validation error', message: error.message } )
+            // in case of an error saving the blog end the request and send response
+            // newBlog.save() validate input data according to the built-in
+            // and custom validations defined in the model and create a validation error
+            // in case input validation fail
+            res.send( { status: 'Blog input validation error', message: error.message } )
 
           } else {
-            // Query Blog and filter for newBlogTitle then call function(blog) to
-            // check if a blog with newBlogTitle exist
-            Blog.findOne(newBlogTitle).then(async function(blog) {
-              if (!blog) {
+            // to update the author user object with the new blog reference the new
+            // blog id must be retrieved. therefore Query Blog and filter for
+            // newBlogTitle then call function(error, blog) to check
+            // if an error occurs or blod with newBlogTitle not exist
+            Blog.findOne(newBlogTitle, async function(error, blog) {
+
+              if (error) {
+                // in case of an error finding blog end the request and send response
+                res.send( { status: 'Error in blog query', message: error.message } )
+
+              } else if (!blog) {
                 // if no blog found end the request and send response
                 res.send('No Blog with this Title. Retrieving blogid not possible')
 
               } else {
+                // blog exist with newBlogTitle
                 // assign the new blog id of the just created Blog Object to newBlogId
                 const newBlogId = blog._id
                 // define an empty blog reference array and assign to idArr
@@ -72,7 +90,6 @@ module.exports = {
                 // update the author user object and add the new blog reference array
                 await User.updateOne(newBlogAuthorEmail, { "$push": { "ref.blogs": idArr } })
                 res.send('Blog successfully created and User updated. Retrieving blogid :' +newBlogId)
-
               }
             })
           }
@@ -88,24 +105,33 @@ module.exports = {
     // blog title from request body and assign it to newBlogTitle
     var removeBlogTitle = { title: req.body.title }
 
-    // Query Blog and filter for removeBlogTitle then call function(blog) to
-    // check if a blog with removeBlogTitle exist
-    Blog.findOne(removeBlogTitle).then(function(blog) {
-      if(!blog) {
+    // Query Blog and filter for removeBlogTitle then call function(error, blog) to check
+    // if an error occurs or blog with removeBlogTitle not exist
+    Blog.findOne(removeBlogTitle, function(error, blog) {
+      if (error) {
+        // in case of an error finding blog end the request and send response
+        res.send( { status: 'Error in blog query', message: error.message } )
+
+      } else if (!blog) {
         // if no blog found end the request and send response
         res.send('No Blog with this Title. Blog Removal not possible')
 
       } else {
+        // blog has been found
         // create the blogid reference object
         var removeBlogId = { _id: blog._id }
         // create the User.findOne filter object using the
         // author email from blog object and assign it to removeBlogAuthorEmail
         var removeBlogAuthorEmail = { email: blog.author.email }
 
-        // Query User and filter for removeBlogAuthorEmail then call function(user) to
-        // check if a user with removeBlogAuthorEmail exist
-        User.findOne(removeBlogAuthorEmail).then(function(user) {
-          if (!user) {
+        // Query User and filter for removeBlogAuthorEmail then call function(error, user) to check
+        // if an error occurs or user with removeBlogTitle not exist
+        User.findOne(removeBlogAuthorEmail, function(error, user) {
+          if (error) {
+            // in case of an error finding user end the request and send response
+            res.send( { status: 'Error in user query', message: error.message } )
+
+          } else if (!user) {
             // if no user exist delete only blog match removeBlogId
             Blog.deleteOne(removeBlogId, async function(error) {
               if (error) {
@@ -118,7 +144,8 @@ module.exports = {
             })
 
           } else {
-            // if user exist delete blog match removeBlogId and update user
+            // if user exist delete blog match removeBlogId
+            // and update blog reference on user object
             Blog.deleteOne(removeBlogId, async function(error) {
               if (error) {
                 // in case an error occur end the request and send response
@@ -196,6 +223,8 @@ module.exports = {
       // find all Blog Objects in database to be displayed that match timeQuery
       // all found blogs stored in blogs array
       Blog.find(timeQuery, function(error, blogs) {
+
+        console.log(blogs)
 
         if (error) {
           res.send( { status: 'Blog query error', message: error.message } )
