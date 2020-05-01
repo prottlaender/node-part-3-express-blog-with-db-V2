@@ -13,6 +13,18 @@ module.exports = {
     // user email from request body and assign it to userEmail
     var userEmail = { email: req.body.email }
 
+    // assign input data from request body to input variables
+    var name = req.body.name
+    var lastname = req.body.lastname
+    var email = req.body.email
+
+    // create a new User Object with input from the req.body
+    const newUser = new User({
+      name: name,
+      lastname: lastname,
+      email: email,
+    })
+
     // Query User and filter for userEmail then call function(error, user) to check
     // if an error occurs or user with userEmail already exist
     User.findOne(userEmail, function(error, user) {
@@ -28,7 +40,7 @@ module.exports = {
       } else {
         // if no user found new user can be created
         // create a new User Object with input from the req.body
-        const newUser = new User(req.body)
+        // const newUser = new User(req.body)
 
         // save the newUser with callback function as parameter
         newUser.save(function(error, user) {
@@ -41,7 +53,8 @@ module.exports = {
 
           } else {
             // end the request and send response
-            res.send('User has been successfully added')
+            //res.send('User has been successfully added')
+            res.send('User has been successfully created')
           }
         })
       }
@@ -79,7 +92,7 @@ module.exports = {
             // if an error occur end the request and send response
             // user.save() validate new updateUserEmail according to the built-in
             // and custom validations defined in the model and create a validation error
-            // in case input validation fail
+            // in case input validation fail end request and send response
             res.send( { status: 'User input validation error', message: error.message} )
 
           } else {
@@ -87,47 +100,58 @@ module.exports = {
             // therefore we must get the blog references from the updatedUser and assign these
             // blog references in userBlogRefArr array
             var userBlogRefArr = updatedUser.ref.blogs
-            // loop through all user blog references and find the id for each
-            // referenced blog
-            for (i = 0; i < userBlogRefArr.length; i++) {
-              // for each blog reference we must find the blog to update the new author email
-              // therefore for each blog reference create the Blog.findOne filter object
-              // using the blog reference id and assign it to userBlogRef
-              var userBlogRef = { _id: userBlogRefArr[i]._id }
-              // Query Blog and filter for userBlogRef then call function(error, blog) to check
-              // if an error occurs or blog with userBlogRef not exist
-              Blog.findOne(userBlogRef, function(error, blog) {
 
-                if (error) {
-                  // in case of an error finding blog end the request and send response
-                  res.send( { status: 'Error in blog query. User and Blog Update not possible', message: error.message } )
+            if (userBlogRefArr.length == 0) {
+              // if no blog references found end request and send response
+              res.send('No Blog references on User found. Only User successfully updated')
 
-                } else if (!blog) {
-                  // if no blog found log into console.
-                  console.log('No Blog found. User update possible. No Blog for blogid: ' +blog._id)
+            } else {
+              // loop through all user blog references and find the id for each
+              // referenced blog
+              for (i = 0; i < userBlogRefArr.length; i++) {
+                // for each blog reference we must find the blog to update the new author email
+                // therefore for each blog reference create the Blog.findOne filter object
+                // using the blog reference id and assign it to userBlogRef
+                var userBlogRef = { _id: userBlogRefArr[i]._id }
+                // Query Blog and filter for userBlogRef then call function(error, blog) to check
+                // if an error occurs or blog with userBlogRef not exist
+                Blog.findOne(userBlogRef, function(error, blog) {
 
-                } else {
-                  // change existing blog.author.email value to updateUserEmail
-                  blog.author.email = updateUserEmail
-                  // save the updated blog with callback function
-                  blog.save(function(error, updatedBlog) {
-                    if (error) {
-                      // if error occur log into console
-                      console.log('Error saving update for blogid: ' +updatedBlog._id)
+                  if (error) {
+                    // in case of an error finding blog log into console
+                    console.log( { status: 'Error in blog query for given blog reference', message: error.message } )
 
-                    } else {
-                      // log into console
-                      console.log('Update successfull for blogid: ' +updatedBlog._id)
-                    }
-                  })
-                }
-              })
+                  } else if (!blog) {
+                    // if no blog found log into console
+                    console.log('No Blog found for given blog reference' +updatedBlog._id)
+
+                  } else {
+                    // if blog found update existing blog.author.email value with updateUserEmail
+                    blog.author.email = updateUserEmail
+                    // save the updated blog with callback function
+                    blog.save(function(error, updatedBlog) {
+                      if (error) {
+                        // if error occur log into console
+                        console.log('Error saving update for blogid: ' +updatedBlog._id)
+
+                      } else {
+                        // log into console
+                        console.log('Update successfull for blogid: ' +updatedBlog._id)
+                      }
+                    // End blog.save()
+                    })
+                  }
+                })
+              // end loop through all user blog references
+              }
+              // end the request and send response
+              res.send('User Email has been successfully updated')
             }
-            // end the request and send response
-            res.send('User successfully updated. New Email: ' +updateUserEmail)
           }
+        // End user.save()
         })
       }
+    // End user.findOne()
     })
   // End updateUserEmail Module
   },
@@ -158,7 +182,7 @@ module.exports = {
             res.send( { status: 'User deletion error. User can not be deleted', message: error.message } )
 
           } else {
-            // if user has been found end the request and send response
+            // end the request and send response
             res.send('User successfully removed in database')
           }
         })

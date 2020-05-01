@@ -11,14 +11,7 @@ module.exports = {
   createBlog: function (req, res) {
     // create the User.findOne filter object using the
     // author email from request body and assign it to newBlogAuthorEmail
-    // User.findOne will be used to check if the user exist with newBlogAuthorEmail
     var newBlogAuthorEmail = { email: req.body.email }
-
-    // create the Blog.findOne filter object using the
-    // new blog title from request body and assign it to newBlogTitle
-    // Blog.findOne will be used to retrieve the new created blogid which must
-    // be added as blog reference on the authors user object
-    var newBlogTitle = { title: req.body.title }
 
     // assign input data from request body to input variables
     var title = req.body.title
@@ -37,7 +30,7 @@ module.exports = {
     })
 
     // Query User and filter for newBlogAuthorEmail then call function(error, user) to check
-    // if an error occurs or user with userEmail not exist
+    // if an error occurs or user with user email not exist
     User.findOne(newBlogAuthorEmail, function(error, user) {
       if (error) {
         // in case of an error finding user end the request and send response
@@ -63,10 +56,13 @@ module.exports = {
             res.send( { status: 'Blog input validation error', message: error.message } )
 
           } else {
-            // to update the author user object with the new blog reference the new
-            // blog id must be retrieved. therefore Query Blog and filter for
-            // newBlogTitle then call function(error, blog) to check
-            // if an error occurs or blod with newBlogTitle not exist
+
+            // create the Blog.findOne filter object using the
+            // new blog title from request body and assign it to newBlogTitle
+            var newBlogTitle = { title: req.body.title }
+
+            //Query Blog and filter for newBlogTitle then call function(error, blog) to check
+            // if an error occurs or blog with title not exist
             Blog.findOne(newBlogTitle, async function(error, blog) {
 
               if (error) {
@@ -102,11 +98,11 @@ module.exports = {
   // removeBlog Module
   removeBlog: function(req, res) {
     // create the Blog.findOne filter object using the
-    // blog title from request body and assign it to newBlogTitle
+    // blog title from request body and assign it to removeBlogTitleFilter
     var removeBlogTitle = { title: req.body.title }
 
     // Query Blog and filter for removeBlogTitle then call function(error, blog) to check
-    // if an error occurs or blog with removeBlogTitle not exist
+    // if an error occurs or blog with removeBlogTitleFilter not exist
     Blog.findOne(removeBlogTitle, function(error, blog) {
       if (error) {
         // in case of an error finding blog end the request and send response
