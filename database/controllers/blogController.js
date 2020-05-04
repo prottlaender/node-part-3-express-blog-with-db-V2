@@ -8,11 +8,7 @@ const User = require('../models/userModel');
 module.exports = {
 
   // create Blog Module
-  createBlog: function (req, res) {
-    // create the User.findOne filter object using the
-    // author email from request body and assign it to newBlogAuthorEmail
-    var newBlogAuthorEmail = { email: req.body.email }
-
+  createBlog: function (req, res, next) {
     // assign input data from request body to input variables
     var title = req.body.title
     var authorFirstName = req.body.firstname
@@ -29,135 +25,110 @@ module.exports = {
       date: date,
     })
 
-    // Query User and filter for newBlogAuthorEmail then call function(error, user) to check
-    // if an error occurs or user with user email not exist
-    User.findOne(newBlogAuthorEmail, function(error, user) {
-      if (error) {
-        // in case of an error finding user end the request and send response
-        res.send( { status: 'Error in user query', message: error.message } )
+    // try to find a user by author email and catch default error in case query fail
+    try {
+      // find one user by author email
+      User.findOne( { email: authorEmail }, function(error, user) {
+        if (!user) {
+          // if no user found end the request and send response
+          res.status(400).send({ code: 400, status: 'Bad Request', message: 'No User for this Author Email. Create Blog not possible' })
 
-      } else if (!user) {
-        // if no user found end the request and send response
-        res.send('No User for this Author Email. Create Blog not possible')
+        } else if (user.name !== authorFirstName || user.lastname !== authorLastName) {
+          // if user found but first- or lastname do not match end the request and send response
+          res.status(400).send({ code: 400, status: 'Bad Request', message: 'Author firstname, lastname do not match. Create Blog not possible' })
 
-      } else if (user.name !== authorFirstName || user.lastname !== authorLastName) {
-        // if user found but first- lastname not match end the request and send response
-        res.send('The Author First- and Lastname entered not match the User found. Create Blog not possible')
+        } else {
+          // if user found and first- and lastname match save the new Blog Object
+          newBlog.save(function(err, blog) {
+            if (err) {
+              // in case of an input validation err occur end the request and send response
+              res.status(400).send({ code: 400, status: 'Bad Request', message: 'Input validation error: ' +err.message })
 
-      } else {
-        // user found and first- lastname match
-        // save new Blog Object
-        newBlog.save(function(error, blog) {
-          if (error) {
-            // in case of an error saving the blog end the request and send response
-            // newBlog.save() validate input data according to the built-in
-            // and custom validations defined in the model and create a validation error
-            // in case input validation fail
-            res.send( { status: 'Blog input validation error', message: error.message } )
-
-          } else {
-
-            // create the Blog.findOne filter object using the
-            // new blog title from request body and assign it to newBlogTitle
-            var newBlogTitle = { title: req.body.title }
-
-            //Query Blog and filter for newBlogTitle then call function(error, blog) to check
-            // if an error occurs or blog with title not exist
-            Blog.findOne(newBlogTitle, async function(error, blog) {
-
-              if (error) {
-                // in case of an error finding blog end the request and send response
-                res.send( { status: 'Error in blog query', message: error.message } )
-
-              } else if (!blog) {
-                // if no blog found end the request and send response
-                res.send('No Blog with this Title. Retrieving blogid not possible')
-
-              } else {
-                // blog exist with newBlogTitle
-                // assign the new blog id of the just created Blog Object to newBlogId
-                const newBlogId = blog._id
-                // define an empty blog reference array and assign to idArr
-                var idArr = []
-                // define newBlogId reference object and assign to idObj
-                var idObj = { _id: newBlogId }
-                // push idObj into the idArr
-                idArr.push(idObj)
-                // update the author user object and add the new blog reference array
-                await User.updateOne(newBlogAuthorEmail, { "$push": { "ref.blogs": idArr } })
-                res.send('Blog successfully created and User updated. Retrieving blogid :' +newBlogId)
+            } else {
+              // try to update user with blog reference and catch individual error in case query fail
+              try {
+                // update the author user object with the new blog reference array
+                User.updateOne( { email: authorEmail }, { $push: { 'ref.blogs': [{ _id: blog._id }] } }, function(err, result) {
+                  res.status(200).send({ code: 200, status: 'Ok', message: 'Blog successfully created and User updated. Retrieving blogid: ' +blog._id })
+                })
+              // catch err in case User.updateOne fail and invoke individual err handler
+              } catch (err) {
+                res.status(502).send({ code: 502, status: 'Bad Gateway', message: 'New Blog saved but update User blog reference failed: ' +err.message })
               }
-            })
-          }
-        })
-      }
-    })
+            }
+          })
+        }
+      })
+    // catch error in case User.findOne fail and invoke default error handler
+    } catch (error) {
+      next(error)
+    }
   // End create Blog Module
   },
 
   // removeBlog Module
-  removeBlog: function(req, res) {
-    // create the Blog.findOne filter object using the
-    // blog title from request body and assign it to removeBlogTitleFilter
-    var removeBlogTitle = { title: req.body.title }
+  removeBlog: function(req, res, next) {
+    // try to find one blog to be removed by title. catch default error in case it does not work
+    try {
+      // find one blog to be removed by title
+      Blog.findOne({ title: req.body.title }, function(error, blog) {
+       if (!blog) {
+          // if no blog found end the request and send response
+          res.status(400).send({ code: 400, status: 'Bad Request', message: 'No Blog with this Title. Blog Removal not possible' })
 
-    // Query Blog and filter for removeBlogTitle then call function(error, blog) to check
-    // if an error occurs or blog with removeBlogTitleFilter not exist
-    Blog.findOne(removeBlogTitle, function(error, blog) {
-      if (error) {
-        // in case of an error finding blog end the request and send response
-        res.send( { status: 'Error in blog query', message: error.message } )
-
-      } else if (!blog) {
-        // if no blog found end the request and send response
-        res.send('No Blog with this Title. Blog Removal not possible')
-
-      } else {
-        // blog has been found
-        // create the blogid reference object
-        var removeBlogId = { _id: blog._id }
-        // create the User.findOne filter object using the
-        // author email from blog object and assign it to removeBlogAuthorEmail
-        var removeBlogAuthorEmail = { email: blog.author.email }
-
-        // Query User and filter for removeBlogAuthorEmail then call function(error, user) to check
-        // if an error occurs or user with removeBlogTitle not exist
-        User.findOne(removeBlogAuthorEmail, function(error, user) {
-          if (error) {
-            // in case of an error finding user end the request and send response
-            res.send( { status: 'Error in user query', message: error.message } )
-
-          } else if (!user) {
-            // if no user exist delete only blog match removeBlogId
-            Blog.deleteOne(removeBlogId, async function(error) {
-              if (error) {
-                // in case an error occur end the request and send response
-                res.send( { status: 'Blog deletion error', message: error.message } )
+        } else {
+          // if blog has been found
+          // try to find a user by author email. catch default error if it does not work
+          try {
+            // find one user by author email
+            User.findOne({ email: blog.author.email }, function(error, user) {
+              if (!user) {
+                // if no user has been found
+                // try to delete only one blog by blog id. catch default error if it does not work
+                try {
+                  // delete only one blog
+                  Blog.deleteOne({ _id: blog._id }, function(error, result) {
+                    res.status(200).send({ code: 200, status: 'Ok', message: 'Blog removed. No User found to update User blog reference' })
+                  })
+                // catch error in case Blog.deleteOne fail and invoke default error handler
+                } catch (error) {
+                  next(error)
+                }
 
               } else {
-                res.send('Blog successfully removed. No User found with Author Email.')
+                // if user has been found
+                // try to delete one blog by blog id and update user. catch default error if it does not work
+                try {
+                  // delete one blog
+                  Blog.deleteOne({ _id: blog._id }, function(error, result) {
+                    // try to update user Object and catch individual err if it does not work
+                    try {
+                        // remove blog id reference object from the user Object using the $pull operator
+                        User.updateOne({ email: blog.author.email }, { $pull: { 'ref.blogs': { _id: blog._id } } }, function(err, result) {
+                          res.status(200).send({ code: 200, status: 'Ok', message: 'Blog removed. User blog reference successfully updated' })
+                        })
+                    // catch err in case User.updateOne fail and invoke individual err handler
+                    } catch (err) {
+                      res.status(502).send( { code: 502, status: 'Bad Gateway', message: 'Blog removed but update User blog reference failed: ' +err.message } )
+                    }
+
+                  })
+                // catch error in case Blog.deleteOne fail and invoke default error handler
+                } catch (error) {
+                  next(error)
+                }
               }
             })
-
-          } else {
-            // if user exist delete blog match removeBlogId
-            // and update blog reference on user object
-            Blog.deleteOne(removeBlogId, async function(error) {
-              if (error) {
-                // in case an error occur end the request and send response
-                res.send( { status: 'Blog deletion error', message: error.message } )
-
-              } else {
-                // update the User Object that match removeAuthorEmail
-                // and remove the blogid reference object from the user using the $pull operator
-                await User.updateOne(removeBlogAuthorEmail, { "$pull": { "ref.blogs": removeBlogId } })
-                res.send('Blog successfully removed. User successfully updated')
-              }
-            })
+          // catch error in case User.findOne fail and invoke default error handler
+          } catch (error) {
+            next(error)
           }
-        })
-      }
-    })
+        }
+      })
+    // catch error in case Blog.findOne fail and invoke default error handler
+    } catch (error) {
+      next(error)
+    }
   // End removeBlog Module
   },
 
@@ -165,39 +136,36 @@ module.exports = {
   returnAllBlogs: function(req, res, next) {
 
     if (url == '/blogs') {
+      // try to find all Blog Objects and catch default error if it does not work
+      try {
+        Blog.find({}, function(error, blogs) {
 
-      // find all Blog Objects in database to be displayed
-      // all blogs stored in blogs array
-      Blog.find({}, function(error, blogs) {
-
-        if (error) {
-          // in case of an error end the request and send response
-          res.send( { status: 'Blog query error', message: error.message } )
-
-        } else if (blogs.length == 0) {
+          if (blogs.length == 0) {
             // in case no blog found end the request and send response
-            res.send('no blogs found')
+            res.status(200).send({ code: 200, status: 'Ok', message: 'No blogs found' })
 
-        } else {
-          // define an empty allBlogs array
-          var allBlogs = []
-          // loop through the blogs array
-          for (i = 0; i < blogs.length; i++) {
-            // define a dataset object for each item in blogs array
-            var dataset = {
-              title: blogs[i].title,
-              author: blogs[i].author,
-              date: blogs[i].date
+          } else {
+            // define an empty allBlogs array
+            var allBlogs = []
+            // loop through the blogs array
+            for (i = 0; i < blogs.length; i++) {
+              // define a dataset object for each item in blogs array
+              var dataset = {
+                title: blogs[i].title,
+                author: blogs[i].author,
+                date: blogs[i].date
+              }
+              // push each dataset object into allBlogs array
+              allBlogs.push(dataset)
             }
-            // push each dataset object into allBlogs array
-            allBlogs.push(dataset)
+            // end the request and send allBlogs response
+            res.status(200).send({ code: 200, status: 'Ok', message: 'Blogs found', data: allBlogs })
           }
-          // end the request and send allBlogs response
-          res.send(allBlogs)
-        }
-
-      })
-
+        })
+      // catch error in case Blog.find fail and invoke default error handler
+      } catch (error) {
+        next(error)
+      }
     } else {
       next()
     }
@@ -216,32 +184,29 @@ module.exports = {
       var lte = year+'-'+'12-31'
       var timeQuery = { date: {$gte: gte, $lte: lte} }
 
-      // find all Blog Objects in database to be displayed that match timeQuery
-      // all found blogs stored in blogs array
-      Blog.find(timeQuery, function(error, blogs) {
+      try {
 
-        console.log(blogs)
+        Blog.find(timeQuery, function(error, blogs) {
 
-        if (error) {
-          res.send( { status: 'Blog query error', message: error.message } )
+          if (blogs.length == 0) {
+            res.status(200).send({ code: 200, status: 'Ok', message: 'No Blogs found for this year', year: year })
 
-        } else if (blogs.length == 0) {
-            res.send('no blogs found for this year')
-
-        } else {
-          var yearBlogs = []
-          for (i = 0; i < blogs.length; i++) {
-            var dataset = {
-              title: blogs[i].title,
-              author: blogs[i].author,
-              date: blogs[i].date
+          } else {
+            var yearBlogs = []
+            for (i = 0; i < blogs.length; i++) {
+              var dataset = {
+                title: blogs[i].title,
+                author: blogs[i].author,
+                date: blogs[i].date
+              }
+              yearBlogs.push(dataset)
             }
-            yearBlogs.push(dataset)
+            res.status(200).send({ code: 200, status: 'Ok', message: 'Blogs found for this year', year: year, data: yearBlogs })
           }
-          res.send(yearBlogs)
-        }
-      })
-
+        })
+      } catch (error) {
+        next(error)
+      }
     } else {
       next()
     }
@@ -253,34 +218,34 @@ module.exports = {
 
     if (url == '/blogs'+'/'+year+'/'+month) {
 
-      // $gte: value greater or equal
-      // $lte: value lower or equal
       var gte = year+'-'+month+'-'+'01'
       var lte = year+'-'+month+'-'+'31'
       var timeQuery = { date: {$gte: gte, $lte: lte} }
 
-      Blog.find(timeQuery, function(error, blogs) {
+      try {
 
-        if (error) {
-          res.send( { status: 'Blog query error', message: error.message } )
+        Blog.find(timeQuery, function(error, blogs) {
 
-        } else if (blogs.length == 0) {
-            res.send('no blogs found for this year and month')
+         if (blogs.length == 0) {
+            res.status(200).send({ code: 200, status: 'Ok', message: 'No Blogs found for this year and month', year: year, month: month })
 
-        } else {
-          var yearBlogs = []
-          for (i = 0; i < blogs.length; i++) {
-            var dataset = {
-              title: blogs[i].title,
-              author: blogs[i].author,
-              date: blogs[i].date
+          } else {
+            var yearMonthBlogs = []
+            for (i = 0; i < blogs.length; i++) {
+              var dataset = {
+                title: blogs[i].title,
+                author: blogs[i].author,
+                date: blogs[i].date
+              }
+              yearMonthBlogs.push(dataset)
             }
-            yearBlogs.push(dataset)
+            res.status(200).send({ code: 200, status: 'Ok', message: 'Blogs found for this year and month', year: year, month: month, data: yearMonthBlogs })
           }
-          res.send(yearBlogs)
-        }
-      })
+        })
 
+      } catch (error) {
+        next(error)
+      }
     } else {
       next()
     }
@@ -288,37 +253,35 @@ module.exports = {
   },
 
   // returnDateBlogs Module
-  returnDateBlogs: function(req, res) {
+  returnDateBlogs: function(req, res, next) {
 
-    // $gte: value greater or equal
-    // $lte: value lower or equal
-    var gte = year+'-'+month+'-'+day
-    var lte = year+'-'+month+'-'+day
-    var timeQuery = { date: {$gte: gte, $lte: lte} }
+      var gte = year+'-'+month+'-'+day
+      var lte = year+'-'+month+'-'+day
+      var timeQuery = { date: {$gte: gte, $lte: lte} }
 
-    Blog.find(timeQuery, function(error, blogs) {
+      try {
 
-      if (error) {
-        res.send( { status: 'Blog query error', message: error.message } )
+        Blog.find(timeQuery, function(error, blogs) {
+          if (blogs.length == 0) {
+            res.status(200).send({ code: 200, status: 'Ok', message: 'No Blogs found for this date', year: year, month: month, day: day })
 
-      } else if (blogs.length == 0) {
-          res.send('no blogs found for this date')
-
-      } else {
-        var yearBlogs = []
-        for (i = 0; i < blogs.length; i++) {
-          var dataset = {
-            title: blogs[i].title,
-            author: blogs[i].author,
-            date: blogs[i].date
+          } else {
+            var dateBlogs = []
+            for (i = 0; i < blogs.length; i++) {
+              var dataset = {
+                title: blogs[i].title,
+                author: blogs[i].author,
+                date: blogs[i].date
+              }
+              dateBlogs.push(dataset)
+            }
+            res.status(200).send({ code: 200, status: 'Ok', message: 'Blogs found for this date', year: year, month: month, day: day, data: dateBlogs  })
           }
-          yearBlogs.push(dataset)
-        }
-        res.send(yearBlogs)
+        })
+      } catch (error) {
+        next(error)
       }
-    })
   // End returnDateBlogs Module
   },
-
 // End export the Blog Controller Modules
 }

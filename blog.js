@@ -60,23 +60,23 @@ app.get('/blogs/:year?/:month?/:day?',
         blogController.returnYearBlogs,
         blogController.returnMonthBlogs,
         blogController.returnDateBlogs
-
       )
 
-// default route error handling. This matches all routes and all methods
+// default route error handler. matches all routes and all methods
 app.use((req, res, next) => {
  res.status(404).send({
- status: 404,
- error: 'Bad request. Route Not found'
+ code: 404,
+ status: 'Not found',
+ message: 'Requested route not found'
  })
 })
 
-// default error handler middleware
+// default server error handler
 app.use((error, req, res, next) => {
- console.error(error.stack);
  res.status(500).send({
-   status: 500,
-   error: 'Internal Server Error'
+   code: 500,
+   status: 'Internal Server Error',
+   message: error.message
  });
 })
 
@@ -86,4 +86,4 @@ const server = http.createServer(app);
 // server listen for any incoming requests
 server.listen(3000);
 
-console.log('My express web server is alive and running at port 3000')
+console.log( { status: "express server start successful", message: "express server successfully started at port 3000" } )
